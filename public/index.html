@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LinkSnap — Extract All Links</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --border: #1e1e2e;
+      --accent: #00ff88;
+      --accent2: #0088ff;
+      --danger: #ff4466;
+      --text: #e8e8f0;
+      --muted: #555570;
+      --internal: #00ff88;
+      --external: #0088ff;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* Animated background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px 100px;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 52px;
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.78rem;
+      margin-top: 8px;
+    }
+
+    /* Input Area */
+    .input-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 32px;
+    }
+
+    .input-label {
+      font-size: 0.72rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="text"]::placeholder {
+      color: var(--muted);
+    }
+
+    button#extractBtn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 26px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    button#extractBtn:hover { opacity: 0.85; }
+    button#extractBtn:active { transform: scale(0.97); }
+    button#extractBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Stats Bar */
+    .stats-bar {
+      display: none;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      padding: 16px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.78rem;
+    }
+
+    .stats-bar.visible { display: flex; }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .stat-num {
+      font-weight: 700;
+      font-size: 1rem;
+      font-family: 'Syne', sans-serif;
+    }
+
+    /* Filters */
+    .filter-row {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .filter-row.visible { display: flex; }
+
+    .filter-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 180px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      outline: none;
+    }
+
+    .search-input:focus { border-color: var(--accent); }
+
+    .copy-all-btn {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .copy-all-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    /* Results */
+    #results {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .link-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      animation: fadeIn 0.2s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    .link-type-badge {
+      flex-shrink: 0;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+
+    .badge-internal {
+      background: rgba(0,255,136,0.12);
+      color: var(--internal);
+      border: 1px solid rgba(0,255,136,0.25);
+    }
+
+    .badge-external {
+      background: rgba(0,136,255,0.12);
+      color: var(--external);
+      border: 1px solid rgba(0,136,255,0.25);
+    }
+
+    .link-info { flex: 1; min-width: 0; }
+
+    .link-url {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text);
+      word-break: break-all;
+      margin-bottom: 3px;
+    }
+
+    .link-text {
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .link-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.7rem;
+      padding: 5px 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Loading */
+    .loader {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 24px;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .loader.visible { display: flex; }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .error-box {
+      display: none;
+      background: rgba(255,68,102,0.08);
+      border: 1px solid rgba(255,68,102,0.3);
+      border-radius: 10px;
+      padding: 16px 20px;
+      color: var(--danger);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      margin-bottom: 16px;
+    }
+
+    .error-box.visible { display: block; }
+
+    /* Empty */
+    .empty-msg {
+      display: none;
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .empty-msg.visible { display: block; }
+
+    /* Count */
+    .result-count {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-row">
+        <div class="logo-icon">🔗</div>
+        <span style="font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted)">v1.0</span>
+      </div>
+      <h1>Link<span>Snap</span></h1>
+      <p class="subtitle">// paste a URL → extract every link on that page</p>
+    </header>
+
+    <div class="input-section">
+      <label class="input-label" for="urlInput">Target URL</label>
+      <div class="input-row">
+        <input type="text" id="urlInput" placeholder="ijddt.com/volume16issue3/" autocomplete="off" spellcheck="false"/>
+        <button id="extractBtn" onclick="extractLinks()">Extract →</button>
+      </div>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+    <div class="loader" id="loader"><div class="spinner"></div> Fetching page and extracting links...</div>
+
+    <div class="stats-bar" id="statsBar">
+      <div class="stat">
+        <div class="stat-dot" style="background:#fff"></div>
+        <span class="stat-num" id="totalCount">0</span>
+        <span>total</span>
+      </div>
+      <div class="stat">
+        <div class="stat-dot" style="background:var(--internal)"></div>
+        <span class="stat-num" id="internalCount">0</span>
+        <span>internal</span>
+      </div>
+      <div class="stat">
+        <div class="stat-dot" style="background:var(--external)"></div>
+        <span class="stat-num" id="externalCount">0</span>
+        <span>external</span>
+      </div>
+    </div>
+
+    <div class="filter-row" id="filterRow">
+      <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+      <button class="filter-btn" onclick="setFilter('internal', this)">Internal</button>
+      <button class="filter-btn" onclick="setFilter('external', this)">External</button>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search links..." oninput="renderLinks()"/>
+      <button class="copy-all-btn" onclick="copyAll()">Copy All URLs</button>
+    </div>
+
+    <div class="result-count" id="resultCount"></div>
+    <div id="results"></div>
+    <div class="empty-msg" id="emptyMsg">No links match your filter.</div>
+  </div>
+
+  <script>
+    let allLinks = [];
+    let currentFilter = 'all';
+
+    async function extractLinks() {
+      const url = document.getElementById('urlInput').value.trim();
+      if (!url) return;
+
+      const btn = document.getElementById('extractBtn');
+      btn.disabled = true;
+
+      document.getElementById('errorBox').classList.remove('visible');
+      document.getElementById('statsBar').classList.remove('visible');
+      document.getElementById('filterRow').classList.remove('visible');
+      document.getElementById('loader').classList.add('visible');
+      document.getElementById('results').innerHTML = '';
+      document.getElementById('resultCount').textContent = '';
+      document.getElementById('emptyMsg').classList.remove('visible');
+
+      try {
+        const res = await fetch('/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.error || 'Something went wrong.');
+          return;
+        }
+
+        allLinks = data.links;
+
+        document.getElementById('totalCount').textContent = data.total;
+        document.getElementById('internalCount').textContent = data.internal;
+        document.getElementById('externalCount').textContent = data.external;
+        document.getElementById('statsBar').classList.add('visible');
+        document.getElementById('filterRow').classList.add('visible');
+        document.getElementById('searchInput').value = '';
+        currentFilter = 'all';
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.filter-btn')[0].classList.add('active');
+
+        renderLinks();
+      } catch (e) {
+        showError('Network error. Make sure the server is running.');
+      } finally {
+        document.getElementById('loader').classList.remove('visible');
+        btn.disabled = false;
+      }
+    }
+
+    function renderLinks() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      let filtered = allLinks.filter(l => {
+        if (currentFilter === 'internal' && !l.internal) return false;
+        if (currentFilter === 'external' && l.internal) return false;
+        if (search && !l.url.toLowerCase().includes(search) && !l.text.toLowerCase().includes(search)) return false;
+        return true;
+      });
+
+      const container = document.getElementById('results');
+      const empty = document.getElementById('emptyMsg');
+      const count = document.getElementById('resultCount');
+
+      if (filtered.length === 0) {
+        container.innerHTML = '';
+        empty.classList.add('visible');
+        count.textContent = '';
+        return;
+      }
+
+      empty.classList.remove('visible');
+      count.textContent = `Showing ${filtered.length} link${filtered.length !== 1 ? 's' : ''}`;
+
+      container.innerHTML = filtered.map((link, i) => `
+        <div class="link-card" style="animation-delay:${Math.min(i * 15, 300)}ms">
+          <span class="link-type-badge ${link.internal ? 'badge-internal' : 'badge-external'}">
+            ${link.internal ? 'INT' : 'EXT'}
+          </span>
+          <div class="link-info">
+            <div class="link-url">${escapeHtml(link.url)}</div>
+            <div class="link-text">${escapeHtml(link.text)}</div>
+          </div>
+          <div class="link-actions">
+            <button class="icon-btn" onclick="copyUrl('${escapeAttr(link.url)}')">Copy</button>
+            <button class="icon-btn" onclick="window.open('${escapeAttr(link.url)}','_blank')">Open</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderLinks();
+    }
+
+    function copyUrl(url) {
+      navigator.clipboard.writeText(url).then(() => {
+        // brief visual feedback handled by browser
+      });
+    }
+
+    function copyAll() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = allLinks.filter(l => {
+        if (currentFilter === 'internal' && !l.internal) return false;
+        if (currentFilter === 'external' && l.internal) return false;
+        if (search && !l.url.toLowerCase().includes(search)) return false;
+        return true;
+      });
+      const text = filtered.map(l => l.url).join('\n');
+      navigator.clipboard.writeText(text);
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      box.textContent = '⚠ ' + msg;
+      box.classList.add('visible');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function escapeAttr(str) {
+      return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    document.getElementById('urlInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') extractLinks();
+    });
+  </script>
+</body>
+</html>
