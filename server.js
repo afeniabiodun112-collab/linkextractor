@@ -3,14 +3,14 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const pdfParse = require("pdf-parse");
 const path = require("path");
-const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+
+// ── Email helpers ─────────────────────────────────────────────────────────────
 
 const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
 
@@ -26,47 +26,36 @@ function isPdfUrl(url, contentType = "") {
 }
 
 async function fetchPdfEmails(url) {
-  try {
-    const response = await axios.get(url, {
-      responseType: "arraybuffer",
-      timeout: 30000,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-    const data = await pdfParse(Buffer.from(response.data));
-    const emails = data.text.match(EMAIL_REGEX) || [];
-    return { emails: dedupeEmails(emails), source: "pdf", pages: data.numpages };
-  } catch (err) {
-    console.error(`Error fetching PDF ${url}:`, err.message);
-    return { emails: [], source: "pdf", error: err.message };
-  }
+  const response = await axios.get(url, {
+    responseType: "arraybuffer",
+    timeout: 30000,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    },
+  });
+  const data = await pdfParse(Buffer.from(response.data));
+  const emails = data.text.match(EMAIL_REGEX) || [];
+  return { emails: dedupeEmails(emails), source: "pdf", pages: data.numpages };
 }
 
 async function fetchHtmlEmails(url) {
-  try {
-    const response = await axios.get(url, {
-      timeout: 20000,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "text/html,application/xhtml+xml",
-      },
-    });
-    const html = response.data;
-    const $ = cheerio.load(html);
-    const rawEmails = html.match(EMAIL_REGEX) || [];
-    const mailtoEmails = [];
-    $("a[href^='mailto:']").each((_, el) => {
-      const href = $(el).attr("href") || "";
-      const email = href.replace("mailto:", "").split("?")[0].trim();
-      if (email) mailtoEmails.push(email);
-    });
-    const all = [...rawEmails, ...mailtoEmails];
-    return { emails: dedupeEmails(all), source: "html" };
-  } catch (err) {
-    console.error(`Error fetching HTML ${url}:`, err.message);
-    return { emails: [], source: "html", error: err.message };
-  }
+  const response = await axios.get(url, {
+    timeout: 20000,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      Accept: "text/html,application/xhtml+xml",
+    },
+  });
+  const html = response.data;
+  const $ = cheerio.load(html);
+  const rawEmails = html.match(EMAIL_REGEX) || [];
+  const mailtoEmails = [];
+  $("a[href^='mailto:']").each((_, el) => {
+    const href = $(el).attr("href") || "";
+    const email = href.replace("mailto:", "").split("?")[0].trim();
+    if (email) mailtoEmails.push(email);
+  });
+  return { emails: dedupeEmails([...rawEmails, ...mailtoEmails]), source: "html" };
 }
 
 async function extractFromUrl(url) {
@@ -86,17 +75,18 @@ async function extractFromUrl(url) {
   }
 }
 
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Extract all links from a page
 app.post("/extract", async (req, res) => {
   let { url } = req.body;
+  if (!url) return res.status(400).json({ error: "URL is required." });
 
-  if (!url) {
-    return res.status(400).json({ error: "URL is required." });
-  }
-
-  // Auto-add https:// if missing
-  if (!/^https?:\/\//i.test(url)) {
-    url = "https://" + url;
-  }
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
 
   try {
     const response = await axios.get(url, {
@@ -141,29 +131,16 @@ app.post("/extract", async (req, res) => {
       links,
     });
   } catch (err) {
-    // If target site returns 404, we treat it as "no links" rather than a server error
-    if (err.response && err.response.status === 404) {
-      return res.json({
-        source: url,
-        total: 0,
-        internal: 0,
-        external: 0,
-        links: [],
-        message: "Target URL returned 404"
-      });
-    }
-
-    const msg =
-      err.response
-        ? `Server responded with ${err.response.status}`
-        : err.code === "ECONNABORTED"
-        ? "Request timed out"
-        : err.message || "Failed to fetch URL";
-
+    const msg = err.response
+      ? `Server responded with ${err.response.status}`
+      : err.code === "ECONNABORTED"
+      ? "Request timed out"
+      : err.message || "Failed to fetch URL";
     res.status(500).json({ error: msg });
   }
 });
 
+// Batch extract emails from URLs (no limit)
 app.post("/extract-emails-batch", async (req, res) => {
   const { urls } = req.body;
   if (!urls || !Array.isArray(urls) || urls.length === 0) {
@@ -190,7 +167,7 @@ app.post("/extract-emails-batch", async (req, res) => {
   );
 
   const processed = results.map((r) =>
-    r.status === "fulfilled" ? r.value : { success: false, error: r.reason?.message }
+    r.status === "fulfilled" ? r.value : { success: false, error: r.reason?.message, emails: [] }
   );
 
   const allEmails = [
@@ -206,6 +183,4 @@ app.post("/extract-emails-batch", async (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Unified Extractor running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`LinkSnap Pipeline running on http://localhost:${PORT}`));

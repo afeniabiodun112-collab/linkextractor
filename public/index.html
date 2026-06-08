@@ -1,477 +1,358 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unified Pipeline — Links & Emails</title>
-    <style>
-        :root {
-            --bg: #0f0f12;
-            --panel-bg: #1a1a1f;
-            --accent: #6366f1;
-            --accent-hover: #4f46e5;
-            --text: #e2e8f0;
-            --text-dim: #94a3b8;
-            --border: #2d2d35;
-            --success: #10b981;
-        }
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LinkSnap Pipeline</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080810;--surface:#0f0f1a;--surface2:#141422;--border:#1c1c2e;
+      --accent:#00ff88;--blue:#0088ff;--red:#ff4466;--yellow:#ffcc00;
+      --text:#e8e8f0;--muted:#44445a;--muted2:#666680;
+    }
+    body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden}
+    body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:36px 36px;opacity:0.3;pointer-events:none;z-index:0}
 
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+    /* ── Layout ── */
+    .wrap{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
 
-        /* Top section — Control Bar */
-        .control-bar {
-            padding: 1.5rem;
-            background: var(--panel-bg);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
+    /* ── Header ── */
+    header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0}
+    .logo{font-size:1.2rem;font-weight:800;letter-spacing:-0.5px}
+    .logo span{color:var(--accent)}
+    .badge{font-family:'Space Mono',monospace;font-size:0.6rem;background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.25);color:var(--accent);padding:2px 8px;border-radius:4px}
 
-        .input-group {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-        }
+    /* ── Control Bar ── */
+    .controls{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;align-items:center;flex-shrink:0;background:var(--surface)}
+    .url-input{flex:1;min-width:260px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'Space Mono',monospace;font-size:0.78rem;outline:none;transition:border-color .2s}
+    .url-input:focus{border-color:var(--accent)}
+    .issue-wrap{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 12px}
+    .issue-label{font-family:'Space Mono',monospace;font-size:0.68rem;color:var(--muted2)}
+    .issue-input{background:transparent;border:none;color:var(--accent);font-family:'Space Mono',monospace;font-size:0.9rem;font-weight:700;width:48px;outline:none;text-align:center}
+    .btn{border:none;border-radius:8px;padding:10px 16px;font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .btn:disabled{opacity:0.35;cursor:not-allowed}
+    .btn-run{background:var(--accent);color:#000}
+    .btn-next{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+    .btn-auto{background:var(--blue);color:#fff}
+    .btn-stop{background:var(--red);color:#fff;display:none}
+    .btn-clear{background:transparent;color:var(--muted2);border:1px solid var(--border)}
+    .btn:hover:not(:disabled){opacity:0.85;transform:translateY(-1px)}
 
-        input {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 0.6rem 1rem;
-            border-radius: 6px;
-            font-size: 0.9rem;
-        }
+    /* ── Status ── */
+    .status-bar{padding:8px 24px;background:var(--surface);border-bottom:1px solid var(--border);font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted2);display:flex;align-items:center;gap:8px;flex-shrink:0;min-height:34px}
+    .status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+    .status-dot.running{background:var(--yellow);animation:pulse .8s ease-in-out infinite}
+    .status-dot.done{background:var(--accent)}
+    .status-dot.error{background:var(--red)}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 
-        #baseUrl { flex: 1; }
-        #issueNum { width: 80px; }
+    /* ── Split Screen ── */
+    .split{display:flex;flex:1;overflow:hidden}
+    .panel{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)}
+    .panel:last-child{border-right:none}
+    .panel-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--surface)}
+    .panel-title{font-weight:700;font-size:0.85rem;display:flex;align-items:center;gap:8px}
+    .count-badge{font-family:'Space Mono',monospace;font-size:0.65rem;background:var(--surface2);border:1px solid var(--border);padding:2px 8px;border-radius:4px;color:var(--muted2)}
+    .copy-all{font-family:'Space Mono',monospace;font-size:0.65rem;background:transparent;border:1px solid var(--border);color:var(--muted2);padding:4px 10px;border-radius:6px;cursor:pointer;transition:all .15s}
+    .copy-all:hover{border-color:var(--accent);color:var(--accent)}
+    .panel-body{flex:1;overflow-y:auto;padding:10px}
+    .panel-body::-webkit-scrollbar{width:4px}
+    .panel-body::-webkit-scrollbar-track{background:transparent}
+    .panel-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
-        .btn-group {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
+    /* ── Empty state ── */
+    .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);font-family:'Space Mono',monospace;font-size:0.72rem;gap:8px;opacity:0.5}
+    .empty-icon{font-size:2rem}
 
-        button {
-            padding: 0.6rem 1.2rem;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+    /* ── Link rows ── */
+    .link-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;background:var(--surface);animation:fadeIn .2s ease forwards;opacity:0}
+    @keyframes fadeIn{to{opacity:1}}
+    .issue-tag{font-family:'Space Mono',monospace;font-size:0.58rem;background:rgba(0,136,255,0.1);border:1px solid rgba(0,136,255,0.2);color:var(--blue);padding:2px 6px;border-radius:4px;flex-shrink:0}
+    .link-url{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--text);word-break:break-all;flex:1}
+    .row-btn{background:transparent;border:1px solid var(--border);color:var(--muted2);font-family:'Space Mono',monospace;font-size:0.62rem;padding:3px 8px;border-radius:5px;cursor:pointer;flex-shrink:0;transition:all .15s}
+    .row-btn:hover{border-color:var(--accent);color:var(--accent)}
 
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-        .btn-secondary { background: #334155; color: white; }
-        .btn-secondary:hover:not(:disabled) { background: #475569; }
-        .btn-danger { background: #991b1b; color: white; }
-        .btn-danger:hover { background: #b91c1c; }
+    /* ── Email rows ── */
+    .email-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;background:var(--surface);animation:fadeIn .2s ease forwards;opacity:0}
+    .email-addr{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--accent);flex:1;word-break:break-all}
 
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .status-bar {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-            padding: 0.25rem 0;
-        }
-
-        /* Main section — Split screen */
-        main {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-            border-top: 1px solid var(--border);
-        }
-
-        .panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            border-right: 1px solid var(--border);
-        }
-
-        .panel:last-child { border-right: none; }
-
-        .panel-header {
-            padding: 1rem 1.5rem;
-            background: var(--panel-bg);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .panel-header h2 {
-            margin: 0;
-            font-size: 1.1rem;
-            color: var(--text);
-        }
-
-        .panel-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-
-        .count-badge {
-            background: var(--bg);
-            padding: 0.2rem 0.6rem;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            border: 1px solid var(--border);
-        }
-
-        .row {
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .row:hover { background: rgba(255,255,255,0.02); }
-
-        .row-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            overflow: hidden;
-        }
-
-        .row-text {
-            font-size: 0.85rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .row-sub {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-        }
-
-        .copy-btn {
-            padding: 0.3rem 0.6rem;
-            font-size: 0.7rem;
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-dim);
-        }
-
-        .copy-btn:hover { border-color: var(--accent); color: var(--text); }
-
-        /* Emails specific styles */
-        .email-breakdown {
-            margin-top: 0.5rem;
-            padding-left: 1rem;
-            border-left: 1px solid var(--accent);
-        }
-
-        .breakdown-item {
-            font-size: 0.75rem;
-            padding: 0.25rem 0;
-            color: var(--text-dim);
-        }
-
-        details summary {
-            cursor: pointer;
-            font-size: 0.75rem;
-            color: var(--accent);
-            list-style: none;
-        }
-
-        details summary::-webkit-details-marker { display: none; }
-
-        /* Animations */
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.6; }
-            100% { opacity: 1; }
-        }
-        .running { animation: pulse 1.5s infinite ease-in-out; }
-    </style>
+    /* ── PDF group in email panel ── */
+    .pdf-group{margin-bottom:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    .pdf-group-header{padding:8px 12px;background:var(--surface2);font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted2);cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+    .pdf-group-header:hover{color:var(--text)}
+    .pdf-group-body{padding:8px}
+    .pdf-email{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--accent);padding:4px 6px;border-radius:5px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .pdf-email:hover{background:rgba(0,255,136,0.05)}
+    .no-emails{font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted);padding:4px 6px}
+  </style>
 </head>
 <body>
+<div class="wrap">
+  <header>
+    <div class="logo">Link<span>Snap</span> Pipeline</div>
+    <div class="badge">v2.0</div>
+  </header>
 
-    <header class="control-bar">
-        <div class="input-group">
-            <label for="baseUrl">Base URL:</label>
-            <input type="text" id="baseUrl" placeholder="ijddt.com/volume16/issue" value="ijddt.com/volume16/issue">
-            <label for="issueNum">Issue #:</label>
-            <input type="number" id="issueNum" value="1" min="1">
+  <div class="controls">
+    <input class="url-input" id="baseUrl" type="text" placeholder="ijddt.com/volume16/issue" spellcheck="false" autocomplete="off"/>
+    <div class="issue-wrap">
+      <span class="issue-label">Issue #</span>
+      <input class="issue-input" id="issueNum" type="number" value="1" min="1"/>
+    </div>
+    <button class="btn btn-run" id="btnRun" onclick="runOnce()">▶ Run Issue</button>
+    <button class="btn btn-next" id="btnNext" onclick="runNext()">⏭ Next Issue</button>
+    <button class="btn btn-auto" id="btnAuto" onclick="startAuto()">▶▶ Auto Run</button>
+    <button class="btn btn-stop" id="btnStop" onclick="stopAuto()">⏹ Stop</button>
+    <button class="btn btn-clear" onclick="clearAll()">🗑 Clear All</button>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Idle — paste a base URL and hit Run</span>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          📄 PDF Links
+          <span class="count-badge" id="pdfCount">0 found</span>
         </div>
+        <button class="copy-all" onclick="copyAllPdfs()">Copy All</button>
+      </div>
+      <div class="panel-body" id="pdfPanel">
+        <div class="empty"><div class="empty-icon">📭</div><span>No PDF links yet</span></div>
+      </div>
+    </div>
 
-        <div class="btn-group">
-            <button id="runBtn" class="btn-primary">▶ Run Issue</button>
-            <button id="nextBtn" class="btn-secondary">⏭ Next Issue</button>
-            <button id="autoBtn" class="btn-secondary">▶▶ Auto Run</button>
-            <button id="stopBtn" class="btn-danger" style="display: none;">⏹ Stop</button>
-            <button id="clearBtn" class="btn-secondary">🗑 Clear All</button>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          📧 Harvested Emails
+          <span class="count-badge" id="emailCount">0 found</span>
         </div>
+        <button class="copy-all" onclick="copyAllEmails()">Copy All</button>
+      </div>
+      <div class="panel-body" id="emailPanel">
+        <div class="empty"><div class="empty-icon">📭</div><span>No emails yet</span></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-        <div class="status-bar" id="status">Idle</div>
-    </header>
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let allPdfs = [];       // { url, issue }
+  let allEmails = new Set();
+  let emailsByPdf = {};   // { pdfUrl: [emails] }
+  let autoRunning = false;
+  let stopRequested = false;
 
-    <main>
-        <section class="panel">
-            <div class="panel-header">
-                <h2>PDF Links</h2>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <span id="pdfCount" class="count-badge">0 PDF links found</span>
-                    <button id="copyAllPdfs" class="copy-btn">Copy All</button>
-                </div>
-            </div>
-            <div class="panel-content" id="pdfList">
-                <!-- Rows added here -->
-            </div>
-        </section>
+  // ── Status ─────────────────────────────────────────────────────────────────
+  function setStatus(msg, state = 'idle') {
+    document.getElementById('statusText').textContent = msg;
+    const dot = document.getElementById('statusDot');
+    dot.className = 'status-dot' + (state === 'running' ? ' running' : state === 'done' ? ' done' : state === 'error' ? ' error' : '');
+  }
 
-        <section class="panel">
-            <div class="panel-header">
-                <h2>Harvested Emails</h2>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <span id="emailCount" class="count-badge">0 emails found</span>
-                    <button id="copyAllEmails" class="copy-btn">Copy All</button>
-                </div>
-            </div>
-            <div class="panel-content" id="emailList">
-                <!-- Rows added here -->
-            </div>
-        </section>
-    </main>
+  function setBusy(busy) {
+    ['btnRun','btnNext','btnAuto'].forEach(id => document.getElementById(id).disabled = busy);
+    document.getElementById('btnStop').style.display = busy && autoRunning ? 'inline-flex' : 'none';
+  }
 
-    <script>
-        // State
-        let isAutoRunning = false;
-        let pdfLinks = []; // { url, issue, text }
-        let harvestedEmails = new Map(); // email -> [pdfUrls]
-        let stopRequested = false;
+  // ── Core pipeline ──────────────────────────────────────────────────────────
+  async function runPipeline(issueNum) {
+    let base = document.getElementById('baseUrl').value.trim();
+    if (!base) { setStatus('⚠ Paste a base URL first', 'error'); return false; }
+    if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
+    const url = base.endsWith('/') ? base + issueNum : base + issueNum;
 
-        // Elements
-        const baseUrlEl = document.getElementById('baseUrl');
-        const issueNumEl = document.getElementById('issueNum');
-        const runBtn = document.getElementById('runBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        const autoBtn = document.getElementById('autoBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const statusEl = document.getElementById('status');
-        const pdfListEl = document.getElementById('pdfList');
-        const emailListEl = document.getElementById('emailList');
-        const pdfCountEl = document.getElementById('pdfCount');
-        const emailCountEl = document.getElementById('emailCount');
+    setStatus(`Fetching links for issue ${issueNum}...`, 'running');
 
-        // Helpers
-        function setStatus(text, active = false) {
-            statusEl.textContent = text;
-            if (active) statusEl.classList.add('running');
-            else statusEl.classList.remove('running');
+    let linkData;
+    try {
+      const r = await fetch('/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+      linkData = await r.json();
+    } catch (e) {
+      setStatus(`⚠ Network error on issue ${issueNum}`, 'error');
+      return false;
+    }
+
+    if (!linkData.links || linkData.total === 0) {
+      setStatus(`✅ Completed — no more issues found at issue ${issueNum}`, 'done');
+      return null; // signal: stop
+    }
+
+    const pdfs = linkData.links.filter(l => l.url.toLowerCase().endsWith('.pdf')).map(l => l.url);
+
+    if (pdfs.length === 0) {
+      setStatus(`Issue ${issueNum} — no PDFs found, continuing...`, 'running');
+      return true; // valid page, just no PDFs
+    }
+
+    // Add PDFs to left panel
+    pdfs.forEach(u => {
+      if (!allPdfs.find(p => p.url === u)) {
+        allPdfs.push({ url: u, issue: issueNum });
+      }
+    });
+    renderPdfs();
+
+    setStatus(`Extracting emails from ${pdfs.length} PDF(s) on issue ${issueNum}...`, 'running');
+
+    let emailData;
+    try {
+      const r = await fetch('/extract-emails-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls: pdfs })
+      });
+      emailData = await r.json();
+    } catch (e) {
+      setStatus(`⚠ Email extract failed on issue ${issueNum}`, 'error');
+      return true;
+    }
+
+    if (emailData.results) {
+      emailData.results.forEach(res => {
+        if (res.success && res.emails?.length) {
+          emailsByPdf[res.url] = res.emails;
+          res.emails.forEach(e => allEmails.add(e));
         }
+      });
+    }
 
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text);
-        }
+    renderEmails();
+    setStatus(`Done — issue ${issueNum} | ${allPdfs.length} PDFs | ${allEmails.size} emails total`, 'done');
+    return true;
+  }
 
-        function updateUI() {
-            // Update PDF list
-            pdfListEl.innerHTML = '';
-            pdfLinks.forEach(link => {
-                const row = document.createElement('div');
-                row.className = 'row';
-                row.innerHTML = `
-                    <div class="row-info">
-                        <span class="row-text">${link.url}</span>
-                        <span class="row-sub">Issue: ${link.issue} | ${link.text}</span>
-                    </div>
-                    <button class="copy-btn">Copy</button>
-                `;
-                row.querySelector('button').onclick = () => copyToClipboard(link.url);
-                pdfListEl.appendChild(row);
-            });
-            pdfCountEl.textContent = `${pdfLinks.length} PDF links found`;
+  // ── Run once ───────────────────────────────────────────────────────────────
+  async function runOnce() {
+    const n = parseInt(document.getElementById('issueNum').value) || 1;
+    setBusy(true);
+    await runPipeline(n);
+    setBusy(false);
+  }
 
-            // Update Email list
-            emailListEl.innerHTML = '';
-            const sortedEmails = Array.from(harvestedEmails.keys()).sort();
-            sortedEmails.forEach(email => {
-                const sources = harvestedEmails.get(email);
-                const row = document.createElement('div');
-                row.className = 'row';
-                row.style.flexDirection = 'column';
-                row.style.alignItems = 'flex-start';
-                row.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
-                        <span class="row-text" style="font-weight: 600; color: var(--success);">${email}</span>
-                        <button class="copy-btn">Copy</button>
-                    </div>
-                    <details style="width: 100%; margin-top: 0.3rem;">
-                        <summary>Found in ${sources.length} PDFs</summary>
-                        <div class="email-breakdown">
-                            ${sources.map(s => `<div class="breakdown-item">${s}</div>`).join('')}
-                        </div>
-                    </details>
-                `;
-                row.querySelector('button').onclick = () => copyToClipboard(email);
-                emailListEl.appendChild(row);
-            });
-            emailCountEl.textContent = `${sortedEmails.length} emails found`;
-        }
+  // ── Next issue ─────────────────────────────────────────────────────────────
+  async function runNext() {
+    const inp = document.getElementById('issueNum');
+    inp.value = (parseInt(inp.value) || 1) + 1;
+    setBusy(true);
+    await runPipeline(parseInt(inp.value));
+    setBusy(false);
+  }
 
-        async function runPipeline(issue) {
-            const base = baseUrlEl.value.trim();
-            const fullUrl = base.startsWith('http') ? base + issue : 'https://' + base + issue;
-            
-            setStatus(`Fetching links for issue ${issue}...`, true);
-            
-            try {
-                const linkResp = await fetch('/extract', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: fullUrl })
-                });
-                
-                const linkData = await linkResp.json();
-                if (!linkResp.ok) throw new Error(linkData.error || 'Failed to fetch links');
-                
-                const pdfsFound = linkData.links.filter(l => l.url.toLowerCase().endsWith('.pdf'));
-                
-                if (pdfsFound.length === 0) {
-                    return 0; // Signal completion
-                }
+  // ── Auto run ───────────────────────────────────────────────────────────────
+  async function startAuto() {
+    autoRunning = true;
+    stopRequested = false;
+    document.getElementById('btnStop').style.display = 'inline-flex';
+    setBusy(true);
 
-                // Add new PDF links (prevent duplicates if possible, but specified to accumulate)
-                pdfsFound.forEach(l => {
-                    if (!pdfLinks.some(existing => existing.url === l.url)) {
-                        pdfLinks.push({ url: l.url, issue, text: l.text });
-                    }
-                });
+    while (!stopRequested) {
+      const n = parseInt(document.getElementById('issueNum').value) || 1;
+      const result = await runPipeline(n);
 
-                updateUI();
+      if (result === null || stopRequested) break; // null = no more issues
 
-                setStatus(`Extracting emails from ${pdfsFound.length} PDFs...`, true);
-                
-                const emailResp = await fetch('/extract-emails-batch', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ urls: pdfsFound.map(l => l.url) })
-                });
-                
-                const emailData = await emailResp.json();
-                if (!emailResp.ok) throw new Error(emailData.error || 'Failed to extract emails');
+      // increment for next loop
+      document.getElementById('issueNum').value = n + 1;
+      await delay(2000);
+    }
 
-                // Merge emails
-                emailData.results.forEach(res => {
-                    if (res.success && res.emails) {
-                        res.emails.forEach(email => {
-                            if (!harvestedEmails.has(email)) {
-                                harvestedEmails.set(email, []);
-                            }
-                            if (!harvestedEmails.get(email).includes(res.url)) {
-                                harvestedEmails.get(email).push(res.url);
-                            }
-                        });
-                    }
-                });
+    autoRunning = false;
+    document.getElementById('btnStop').style.display = 'none';
+    setBusy(false);
+  }
 
-                updateUI();
-                setStatus(`Done — issue ${issue}`);
-                return pdfsFound.length;
+  function stopAuto() {
+    stopRequested = true;
+    setStatus('Stopping after current issue...', 'running');
+  }
 
-            } catch (err) {
-                console.error(err);
-                setStatus(`Error on issue ${issue}: ${err.message}`);
-                return -1; // Error
-            }
-        }
+  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        // Event Listeners
-        runBtn.onclick = async () => {
-            runBtn.disabled = true;
-            nextBtn.disabled = true;
-            autoBtn.disabled = true;
-            const issue = issueNumEl.value;
-            await runPipeline(issue);
-            runBtn.disabled = false;
-            nextBtn.disabled = false;
-            autoBtn.disabled = false;
-        };
+  // ── Clear ──────────────────────────────────────────────────────────────────
+  function clearAll() {
+    allPdfs = [];
+    allEmails = new Set();
+    emailsByPdf = {};
+    document.getElementById('pdfPanel').innerHTML = '<div class="empty"><div class="empty-icon">📭</div><span>No PDF links yet</span></div>';
+    document.getElementById('emailPanel').innerHTML = '<div class="empty"><div class="empty-icon">📭</div><span>No emails yet</span></div>';
+    document.getElementById('pdfCount').textContent = '0 found';
+    document.getElementById('emailCount').textContent = '0 found';
+    setStatus('Idle — cleared', 'idle');
+  }
 
-        nextBtn.onclick = async () => {
-            issueNumEl.value = parseInt(issueNumEl.value) + 1;
-            runBtn.onclick();
-        };
+  // ── Render PDFs ────────────────────────────────────────────────────────────
+  function renderPdfs() {
+    const panel = document.getElementById('pdfPanel');
+    document.getElementById('pdfCount').textContent = allPdfs.length + ' found';
+    panel.innerHTML = allPdfs.map((p, i) => `
+      <div class="link-row" style="animation-delay:${Math.min(i*10,200)}ms">
+        <span class="issue-tag">Issue ${p.issue}</span>
+        <span class="link-url">${esc(p.url)}</span>
+        <button class="row-btn" onclick="copy('${escAttr(p.url)}')">Copy</button>
+      </div>
+    `).join('');
+  }
 
-        autoBtn.onclick = async () => {
-            isAutoRunning = true;
-            stopRequested = false;
-            autoBtn.style.display = 'none';
-            stopBtn.style.display = 'flex';
-            runBtn.disabled = true;
-            nextBtn.disabled = true;
+  // ── Render Emails ──────────────────────────────────────────────────────────
+  function renderEmails() {
+    const panel = document.getElementById('emailPanel');
+    document.getElementById('emailCount').textContent = allEmails.size + ' found';
 
-            while (isAutoRunning && !stopRequested) {
-                const issue = issueNumEl.value;
-                const count = await runPipeline(issue);
-                
-                if (count <= 0 || stopRequested) {
-                    if (count === 0) {
-                        setStatus(`✅ Completed — no more issues found at issue ${issue}`);
-                    }
-                    break;
-                }
-                
-                issueNumEl.value = parseInt(issueNumEl.value) + 1;
-                setStatus(`Waiting for next run...`);
-                await new Promise(r => setTimeout(r, 2000));
-            }
+    const uniqueList = [...allEmails];
 
-            isAutoRunning = false;
-            autoBtn.style.display = 'flex';
-            stopBtn.style.display = 'none';
-            runBtn.disabled = false;
-            nextBtn.disabled = false;
-        };
+    // flat list at top
+    const flatHtml = uniqueList.map((e, i) => `
+      <div class="email-row" style="animation-delay:${Math.min(i*10,200)}ms">
+        <span class="email-addr">${esc(e)}</span>
+        <button class="row-btn" onclick="copy('${escAttr(e)}')">Copy</button>
+      </div>
+    `).join('');
 
-        stopBtn.onclick = () => {
-            stopRequested = true;
-            setStatus(`Stopping...`);
-        };
+    // grouped by PDF
+    const groupHtml = Object.entries(emailsByPdf).map(([pdf, emails]) => `
+      <div class="pdf-group">
+        <div class="pdf-group-header" onclick="toggleGroup(this)">
+          <span>${esc(pdf.split('/').pop())}</span>
+          <span>${emails.length} email${emails.length !== 1 ? 's' : ''} ▾</span>
+        </div>
+        <div class="pdf-group-body">
+          ${emails.length ? emails.map(e => `
+            <div class="pdf-email">
+              <span>${esc(e)}</span>
+              <button class="row-btn" onclick="copy('${escAttr(e)}')">Copy</button>
+            </div>
+          `).join('') : '<div class="no-emails">No emails found</div>'}
+        </div>
+      </div>
+    `).join('');
 
-        clearBtn.onclick = () => {
-            pdfLinks = [];
-            harvestedEmails.clear();
-            updateUI();
-            setStatus('Idle');
-        };
+    panel.innerHTML = flatHtml + (groupHtml ? '<div style="margin-top:14px;font-family:Space Mono,monospace;font-size:0.65rem;color:var(--muted2);margin-bottom:8px;padding-left:4px">▸ BY PDF</div>' + groupHtml : '');
+  }
 
-        document.getElementById('copyAllPdfs').onclick = () => {
-            copyToClipboard(pdfLinks.map(l => l.url).join('\n'));
-        };
+  function toggleGroup(header) {
+    const body = header.nextElementSibling;
+    body.style.display = body.style.display === 'none' ? 'block' : 'none';
+  }
 
-        document.getElementById('copyAllEmails').onclick = () => {
-            const sortedEmails = Array.from(harvestedEmails.keys()).sort();
-            copyToClipboard(sortedEmails.join('\n'));
-        };
-    </script>
+  // ── Copy helpers ───────────────────────────────────────────────────────────
+  function copy(text) { navigator.clipboard.writeText(text); }
+  function copyAllPdfs() { navigator.clipboard.writeText(allPdfs.map(p => p.url).join('\n')); }
+  function copyAllEmails() { navigator.clipboard.writeText([...allEmails].join('\n')); }
+
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escAttr(s) { return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+</script>
 </body>
 </html>
