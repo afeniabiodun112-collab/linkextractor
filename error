@@ -1,0 +1,16 @@
+GET https://linkextractor-jprl.onrender.com/favicon.ico 404 (Not Found)Understand this error
+(index):347  POST https://linkextractor-jprl.onrender.com/extract 500 (Internal Server Error)
+runPipeline @ (index):347
+runBtn.onclick @ (index):413Understand this error
+(index):401 Error: Server responded with 404
+    at runPipeline ((index):354:41)
+    at async runBtn.onclick ((index):413:13)
+runPipeline @ (index):401
+await in runPipeline
+runBtn.onclick @ (index):413Understand this error
+(index):347  POST https://linkextractor-jprl.onrender.com/extract 500 (Internal Server Error)
+runPipeline @ (index):347
+autoBtn.onclick @ (index):434Understand this error
+(index):401 Error: Server responded with 404
+    at runPipeline ((index):354:41)
+    at async autoBtn.onclick ((index):434:31
